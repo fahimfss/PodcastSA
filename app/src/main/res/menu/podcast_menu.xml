@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/prevPage"
+        android:icon="@drawable/ic_prev"
+        app:showAsAction="ifRoom"
+        android:title="Previous Page" />
+    <item
+        android:id="@+id/nextPage"
+        android:icon="@drawable/ic_next"
+        app:showAsAction="ifRoom"
+        android:title="Next Page" />
+</menu>
