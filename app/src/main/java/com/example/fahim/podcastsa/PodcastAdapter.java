@@ -61,11 +61,6 @@ public class PodcastAdapter extends RecyclerView.Adapter<PodcastAdapter.PCViewHo
         holder.cv.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(playingPos!=-1)pcList.get(playingPos).setPlaying(0);
-                playingPos = position;
-                pcList.get(position).setPlaying(1);
-                pcList.get(position).setStatus(1);
-                notifyDataSetChanged();
                 try {
                     listener.itemClick(position);
                 } catch (InterruptedException e) {

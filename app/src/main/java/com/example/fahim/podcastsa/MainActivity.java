@@ -34,11 +34,13 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
 
     private DatabaseHelper helper;
+
     private int currentPage;
     protected ArrayList<PodcastItem> podcastItems;
 
     private RecyclerView podcastRV;
     private ProgressBar loadPodcastRV;
+    private PodcastAdapter podcastAdapter;
 
     private MediaPlayer mediaPlayer;
 
@@ -62,6 +64,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private boolean pageLoading;
 
     private int selectedPodcast;
+    private int previousPodcast;
     private int updateEverySecondCount;
 
 
@@ -108,6 +111,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         musicTitle = (TextView) findViewById(R.id.musicTitle);
 
         selectedPodcast = -1;
+        previousPodcast = -1;
         updateEverySecondCount = 0;
         pageLoading = true;
 
@@ -160,14 +164,23 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         for (PodcastItem p : podcastItems) {
             p.setStatus(helper.isLinkExist(p.getLink(), helper));
         }
-        podcastRV.setAdapter(new PodcastAdapter(podcastItems, this, this));
+        podcastAdapter = new PodcastAdapter(podcastItems, this, this);
+        podcastRV.setAdapter(podcastAdapter);
         podcastRV.setVisibility(View.VISIBLE);
         loadPodcastRV.setVisibility(View.GONE);
     }
 
     @Override
     public void itemClick(int position) throws InterruptedException {
+
+        if(podcastAdapter == null) return;
+
+        if(previousPodcast!=-1)podcastItems.get(previousPodcast).setPlaying(0);
         selectedPodcast = position;
+        previousPodcast = position;
+        podcastItems.get(position).setPlaying(1);
+        podcastItems.get(position).setStatus(1);
+        podcastAdapter.notifyDataSetChanged();
 
         isPaused = false;
         isComplete = false;
@@ -286,13 +299,24 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mp) {
-                isPaused = true;
-                isComplete = true;
-                mediaPlayer.seekTo(0);
-                musicSeekbar.setProgress(0);
-                musicTimeTV.setText(String.format("%02d:%02d", 0, 0));
-                musicPlayBtn.setImageResource(R.drawable.ic_play);
-                musicPlayBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                if(selectedPodcast == podcastItems.size()-1) {
+                    isPaused = true;
+                    isComplete = true;
+                    mediaPlayer.seekTo(0);
+                    musicSeekbar.setProgress(0);
+                    musicTimeTV.setText(String.format("%02d:%02d", 0, 0));
+                    musicPlayBtn.setImageResource(R.drawable.ic_play);
+                    musicPlayBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                }
+                else {
+                    try {
+                        musicSeekbar.setProgress(0);
+                        musicTimeTV.setText(String.format("%02d:%02d", 0, 0));
+                        itemClick(++selectedPodcast);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         });
     }
