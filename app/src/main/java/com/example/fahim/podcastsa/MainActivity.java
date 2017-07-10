@@ -9,7 +9,6 @@ import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.widget.CardView;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -29,11 +28,23 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
+
 import java.util.ArrayList;
+import java.util.HashSet;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
 
-    private DatabaseHelper helper;
+    private final String URL = "Url";
+    private final String LINK = "link";
+    private final String PAGE = "Page";
 
     private int currentPage;
     protected ArrayList<PodcastItem> podcastItems;
@@ -67,11 +78,37 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private int previousPodcast;
     private int updateEverySecondCount;
 
+    private int initialLoading=0;
+
+    private HashSet<String> firebaseDatas;
+
+    FirebaseAuth auth;
+    FirebaseDatabase database;
+    DatabaseReference reference;
+
+    Query query1;
+    ValueEventListener listener1;
+    Query query2;
+    ValueEventListener listener2;
+    Query query3;
+    ValueEventListener listener3;
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        FirebaseApp.initializeApp(this);
+
+        auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() == null) {
+            auth.signInWithEmailAndPassword("fahim.cross@gmail.com", "121212");
+        }
+
+        database = FirebaseDatabase.getInstance();
+        reference = database.getReference();
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         if (prefs.getInt("page", -1) != -1) {
@@ -89,8 +126,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         isComplete = false;
 
         this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
-
-        helper = new DatabaseHelper(this);
 
         podcastRV = (RecyclerView) findViewById(R.id.podcastRV);
         loadPodcastRV = (ProgressBar) findViewById(R.id.loadPodcastRV);
@@ -131,6 +166,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
         });
 
+        fetchFromFirebase();
+
         setPlayer();
 
         new Data().execute(String.valueOf(currentPage));
@@ -156,40 +193,56 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        helper.close();
+        if(listener1 !=null)query1.removeEventListener(listener1);
+        if(listener2 !=null)query2.removeEventListener(listener2);
+        if(listener3 !=null)query3.removeEventListener(listener3);
         mediaPlayer.release();
     }
 
     private void dataFetched() {
-        for (PodcastItem p : podcastItems) {
-            p.setStatus(helper.isLinkExist(p.getLink(), helper));
-        }
-        podcastAdapter = new PodcastAdapter(podcastItems, this, this);
-        podcastRV.setAdapter(podcastAdapter);
         podcastRV.setVisibility(View.VISIBLE);
         loadPodcastRV.setVisibility(View.GONE);
     }
 
     @Override
-    public void itemClick(int position) throws InterruptedException {
+    public void itemClick(int position, boolean unmark) throws InterruptedException {
+        FirebaseData firebaseData = new FirebaseData(podcastItems.get(position).getLink());
 
         if(podcastAdapter == null) return;
 
-        if(previousPodcast!=-1)podcastItems.get(previousPodcast).setPlaying(0);
-        selectedPodcast = position;
-        previousPodcast = position;
+        if(unmark){
+            if(firebaseDatas.contains(firebaseData.getLink())){
+                firebaseDatas.remove(firebaseData.getLink());
+                deleteFromFirebase(firebaseData);
+                podcastItems.get(position).setStatus(0);
+                podcastAdapter.notifyDataSetChanged();
+            }
+            return;
+        }
+        if(!firebaseDatas.contains(firebaseData.getLink())) {
+            firebaseDatas.add(firebaseData.getLink());
+            insertToFirebase(firebaseData);
+        }
+
         podcastItems.get(position).setPlaying(1);
         podcastItems.get(position).setStatus(1);
         podcastAdapter.notifyDataSetChanged();
+
+        if(position==selectedPodcast && !isStop && !isPaused &&!isComplete)return;
+
+
+        if(previousPodcast!=-1)podcastItems.get(previousPodcast).setPlaying(0);
+
+        previousPodcast = position;
+        selectedPodcast = position;
 
         isPaused = false;
         isComplete = false;
         isStop = false;
 
-        helper.putLink(podcastItems.get(position).getLink(), helper);
         musicTitle.setText(podcastItems.get(position).getTitle());
         musicTotalTimeTV.setText(podcastItems.get(position).getLenght());
-        link = "http://www.scientificamerican.com" + podcastItems.get(position).getLink();
+        link = "http://www.scientificamerican.com" + firebaseData.getLink();
 
         musicPlayBtn.setImageResource(R.drawable.ic_pause);
         musicPlayBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
@@ -312,7 +365,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     try {
                         musicSeekbar.setProgress(0);
                         musicTimeTV.setText(String.format("%02d:%02d", 0, 0));
-                        itemClick(++selectedPodcast);
+                        itemClick(++selectedPodcast, false);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -453,6 +506,74 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         }
     }
 
+    private void fetchFromFirebase(){
+        query1 = reference.child(URL).orderByChild(LINK);
+        listener1 = new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                firebaseDatas = new HashSet<>();
+                for(DataSnapshot ds: dataSnapshot.getChildren()){
+                    FirebaseData data = ds.getValue(FirebaseData.class);
+                    firebaseDatas.add(data.getLink());
+                }
+                if(podcastItems!=null){
+                    for(PodcastItem item: podcastItems){
+                        if(firebaseDatas.contains(item.getLink())){
+                            item.setStatus(true);
+                        }
+                    }
+                    podcastAdapter.notifyDataSetChanged();
+                }
+                initialLoading++;
+                if(initialLoading==2)dataFetched();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        };
+        query1.addListenerForSingleValueEvent(listener1);
+    }
+
+    private void insertToFirebase(final FirebaseData data){
+        query2 = reference.child(URL).orderByChild(LINK).equalTo(data.getLink());
+        listener2 = new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if(!dataSnapshot.hasChildren()) {
+                    reference.child(URL).push().setValue(data);
+                }
+                podcastAdapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        };
+        query2.addListenerForSingleValueEvent(listener2);
+    }
+
+    private void deleteFromFirebase(final FirebaseData data){
+        query3 = reference.child(URL).orderByChild(LINK).equalTo(data.getLink());
+        listener3 = new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                for(DataSnapshot ds: dataSnapshot.getChildren()) {
+                    reference.child(URL).child(ds.getKey()).setValue(null);
+                }
+                podcastAdapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        };
+        query3.addListenerForSingleValueEvent(listener3);
+    }
+
     private class Data extends DataSource {
         @Override
         protected void onPostExecute(String s) {
@@ -464,12 +585,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             editor.apply();
 
             podcastItems = podcastItemsGET;
-            Log.d("Datafetched", String.valueOf(podcastItems.size()));
-            for (PodcastItem pi : podcastItems) {
-                pi.setStatus(helper.isLinkExist(pi.getLink(), helper));
+            podcastAdapter = new PodcastAdapter(podcastItems, MainActivity.this, MainActivity.this);
+            podcastRV.setAdapter(podcastAdapter);
+            if(firebaseDatas!=null) {
+                for (PodcastItem pi : podcastItems) {
+                    pi.setStatus(firebaseDatas.contains(pi.getLink()));
+                }
+                if (listener1 != null) query1.removeEventListener(listener1);
             }
-            pageLoading = false;
-            dataFetched();
+            initialLoading++;
+            if(initialLoading==2)dataFetched();
         }
     }
 }

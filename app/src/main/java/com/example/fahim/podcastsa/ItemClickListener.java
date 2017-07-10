@@ -5,5 +5,5 @@ package com.example.fahim.podcastsa;
  */
 
 public interface ItemClickListener {
-    void itemClick(int position) throws InterruptedException;
+    void itemClick(int position, boolean unmark) throws InterruptedException;
 }

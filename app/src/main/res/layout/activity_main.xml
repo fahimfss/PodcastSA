@@ -83,10 +83,10 @@
                 android:id="@+id/loadPodcastRV"
                 android:layout_width="50dp"
                 android:layout_height="50dp"
-                android:layout_gravity="center"
-                android:visibility="gone" />
+                android:layout_gravity="center" />
 
             <android.support.v7.widget.RecyclerView
+                android:visibility="gone"
                 android:id="@+id/podcastRV"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />

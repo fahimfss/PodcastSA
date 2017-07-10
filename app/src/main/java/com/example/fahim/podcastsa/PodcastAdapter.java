@@ -52,8 +52,14 @@ public class PodcastAdapter extends RecyclerView.Adapter<PodcastAdapter.PCViewHo
         holder.podcastTitle.setText(pc.getTitle());
         holder.podcastSecTitle.setText(pc.getSecondaryTitle());
 
-        if(pc.getStatus()==1)holder.cv.setCardBackgroundColor(Color.parseColor("#e8e8e8"));
-        else holder.cv.setCardBackgroundColor(Color.parseColor("#f8f8f8"));
+        if(pc.getStatus()==1){
+            holder.cv.setCardBackgroundColor(Color.parseColor("#e8e8e8"));
+            holder.uncheck.setVisibility(View.VISIBLE);
+        }
+        else {
+            holder.cv.setCardBackgroundColor(Color.parseColor("#f8f8f8"));
+            holder.uncheck.setVisibility(View.GONE);
+        }
 
         if(pc.playing == 1) holder.playing.setVisibility(View.VISIBLE);
         else holder.playing.setVisibility(View.GONE);
@@ -62,7 +68,18 @@ public class PodcastAdapter extends RecyclerView.Adapter<PodcastAdapter.PCViewHo
             @Override
             public void onClick(View v) {
                 try {
-                    listener.itemClick(position);
+                    listener.itemClick(position, false);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        holder.uncheck.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    listener.itemClick(position, true);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -81,6 +98,7 @@ public class PodcastAdapter extends RecyclerView.Adapter<PodcastAdapter.PCViewHo
         TextView podcastTitle;
         TextView podcastSecTitle;
         ImageView playing;
+        ImageView uncheck;
 
         public PCViewHolder(View itemView) {
             super(itemView);
@@ -88,6 +106,7 @@ public class PodcastAdapter extends RecyclerView.Adapter<PodcastAdapter.PCViewHo
             podcastTitle = (TextView) itemView.findViewById(R.id.podcastTitle);
             podcastSecTitle = (TextView) itemView.findViewById(R.id.podcastSecTitle);
             playing = (ImageView) itemView.findViewById(R.id.playingRV);
+            uncheck = (ImageView) itemView.findViewById(R.id.uncheckRV);
         }
     }
 }
