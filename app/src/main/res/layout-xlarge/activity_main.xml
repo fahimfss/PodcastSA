@@ -122,6 +122,7 @@
             android:orientation="horizontal">
 
             <ImageButton
+                android:layout_gravity="center_vertical"
                 android:id="@+id/musicPlayBtn"
                 android:layout_width="50dp"
                 android:layout_height="50dp"
@@ -132,6 +133,7 @@
                 android:src="@drawable/ic_play" />
 
             <TextView
+                android:layout_gravity="center_vertical"
                 android:id="@+id/musicTimeTV"
                 android:layout_width="60dp"
                 android:layout_height="wrap_content"
@@ -140,6 +142,7 @@
                 android:textSize="20sp" />
 
             <SeekBar
+                android:layout_gravity="center_vertical"
                 android:layout_weight="1"
                 android:id="@+id/musicSeekbar"
                 style="@style/CustomSeekBar"
@@ -148,6 +151,7 @@
                 android:thumb="@null" />
 
             <TextView
+                android:layout_gravity="center_vertical"
                 android:id="@+id/musicTotalTimeTV"
                 android:layout_width="60dp"
                 android:layout_height="wrap_content"

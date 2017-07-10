@@ -42,6 +42,7 @@ import java.util.HashSet;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
 
+//    private final String URL = "UPIUrl";
     private final String URL = "Url";
     private final String LINK = "link";
     private final String PAGE = "Page";
@@ -60,6 +61,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private boolean isOutOfScope;
     private boolean isComplete;
 
+    private boolean isTrackLoading=false;
+
     private String link = "";
 
     private ImageButton pageGOBtn;
@@ -74,8 +77,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private boolean pageLoading;
 
-    private int selectedPodcast;
-    private int previousPodcast;
+    private int selectedPodcast=-1;
+
     private int updateEverySecondCount;
 
     private int initialLoading=0;
@@ -146,8 +149,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         musicSeekbar = (SeekBar) findViewById(R.id.musicSeekbar);
         musicTitle = (TextView) findViewById(R.id.musicTitle);
 
-        selectedPodcast = -1;
-        previousPodcast = -1;
         updateEverySecondCount = 0;
         pageLoading = true;
 
@@ -207,75 +208,52 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     @Override
-    public void itemClick(int position, boolean unmark) throws InterruptedException {
+    public void itemClick(int position, boolean turnHighlightOff) throws InterruptedException {
         if(itemClickLock)return;
         itemClickLock = true;
 
         FirebaseData firebaseData = new FirebaseData(podcastItems.get(position).getLink());
 
-        if(podcastAdapter == null) {
-            itemClickLock = false;
-            return;
-        }
+        if(podcastAdapter != null) {
 
-        if(unmark){
-            if(firebaseDatas.contains(firebaseData.getLink())){
-                firebaseDatas.remove(firebaseData.getLink());
-                deleteFromFirebase(firebaseData);
-                podcastItems.get(position).setStatus(0);
+            if (!firebaseDatas.contains(firebaseData.getLink())) {
+                firebaseDatas.add(firebaseData.getLink());
+                insertToFirebase(firebaseData);
+            }
+
+            if (turnHighlightOff) {
+                if (firebaseDatas.contains(firebaseData.getLink())) {
+                    firebaseDatas.remove(firebaseData.getLink());
+                    deleteFromFirebase(firebaseData);
+                    podcastItems.get(position).setStatus(0);
+                    podcastAdapter.notifyDataSetChanged();
+                }
+            }
+            else {
+                podcastItems.get(position).setPlaying(1);
+                podcastItems.get(position).setStatus(1);
+
+                if(selectedPodcast != position) {
+                    if(selectedPodcast!=-1)podcastItems.get(selectedPodcast).setPlaying(0);
+                    selectedPodcast = position;
+
+                    isPaused = false;
+                    isStop = false;
+
+                    link = "http://www.scientificamerican.com" + firebaseData.getLink();
+
+                    musicPlayBtn.setImageResource(R.drawable.ic_pause);
+                    musicPlayBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                    resetAndStartPlayer();
+                }
                 podcastAdapter.notifyDataSetChanged();
             }
-            itemClickLock = false;
-            return;
         }
-        if(!firebaseDatas.contains(firebaseData.getLink())) {
-            firebaseDatas.add(firebaseData.getLink());
-            insertToFirebase(firebaseData);
-        }
-
-        podcastItems.get(position).setPlaying(1);
-        podcastItems.get(position).setStatus(1);
-        podcastAdapter.notifyDataSetChanged();
-
-        if(position==selectedPodcast && !isStop && !isPaused &&!isComplete){
-            itemClickLock = false;
-            return;
-        }
-
-
-        if(previousPodcast!=-1)podcastItems.get(previousPodcast).setPlaying(0);
-
-        previousPodcast = position;
-        selectedPodcast = position;
-
-        isPaused = false;
-        isComplete = false;
-        isStop = false;
-
-        musicTitle.setText(podcastItems.get(position).getTitle());
-        musicTotalTimeTV.setText(podcastItems.get(position).getLenght());
-        link = "http://www.scientificamerican.com" + firebaseData.getLink();
-
-        musicPlayBtn.setImageResource(R.drawable.ic_pause);
-        musicPlayBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        resetAndStartPlayer();
-
         itemClickLock = false;
     }
 
     public void musicPlayBtnClicked(View v) {
-        if (selectedPodcast == -1 || isStop) return;
-        if (isComplete) {
-            mediaPlayer.start();
-
-            isPaused = false;
-            isComplete = false;
-
-            updateEverySecond();
-            musicPlayBtn.setImageResource(R.drawable.ic_pause);
-            musicPlayBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            return;
-        }
+        if (selectedPodcast == -1 || isStop || isTrackLoading) return;
         if (isPaused) {
             mediaPlayer.start();
             isPaused = false;
@@ -299,12 +277,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 if (mediaPlayer != null && updateEverySecondCount == 0) {
                     updateEverySecondCount++;
                     while ((!isPaused || !isComplete) && !isStop && !isOutOfScope) {
-                        musicSeekbar.setProgress(mediaPlayer.getCurrentPosition());
                         handler.post(new Runnable() {
-
                             @Override
                             public void run() {
-                                setProgressText();
+                                setProgressTimeAndSeek();
                             }
                         });
                         try {
@@ -322,9 +298,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         t.start();
     }
 
-    protected void setProgressText() {
-        if(isStop)return;
+    protected void setProgressTimeAndSeek() {
+        if(isStop || isTrackLoading || mediaPlayer==null)return;
         int curPosition = mediaPlayer.getCurrentPosition();
+        musicSeekbar.setProgress(curPosition);
         musicTimeTV.setText(String.format("%02d:%02d", curPosition / 60000, (curPosition / 1000) % 60));
     }
 
@@ -338,6 +315,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             @Override
             public void onBufferingUpdate(MediaPlayer mp, int percent) {
                 musicSeekbar.setSecondaryProgress((musicSeekbar.getMax() / 100) * percent);
+                if(percent>15 && mediaPlayer!=null && !isPaused){
+                    Log.d("On BUffering Update", "here");
+                    isTrackLoading = false;
+                    mediaPlayer.start();
+                    updateEverySecond();
+                }
             }
         });
 
@@ -355,7 +338,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 mediaPlayer.release();
                 mediaPlayer = null;
                 if(!isStop) {
-                    Toast.makeText(MainActivity.this, "Can not play this", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Can not play this "+what, Toast.LENGTH_SHORT).show();
                 }
                 isStop = true;
                 resetMedia();
@@ -380,7 +363,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         musicSeekbar.setProgress(0);
                         musicTimeTV.setText(String.format("%02d:%02d", 0, 0));
                         isComplete = true;
-                        isComplete = true;
                         itemClick(selectedPodcast+1, false);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
@@ -393,6 +375,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private void setProgressControl() {
         int maxProgress = mediaPlayer.getDuration();
         int curProgress = mediaPlayer.getCurrentPosition();
+        mediaPlayer.pause();
 
         musicSeekbar.setMax(maxProgress);
         musicSeekbar.setProgress(curProgress);
@@ -400,9 +383,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
             @Override
             public void onProgressChanged(SeekBar seekbar, int progress, boolean fromUser) {
-                if (fromUser) {
+                if (fromUser && !isTrackLoading) {
                     mediaPlayer.seekTo(progress);
-                    setProgressText();
+                    setProgressTimeAndSeek();
                     if(isPaused)mediaPlayer.pause();
                     else mediaPlayer.start();
                 }
@@ -420,16 +403,30 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
             }
         });
+        musicTitle.setText(podcastItems.get(selectedPodcast).getTitle());
+        musicTotalTimeTV.setText(podcastItems.get(selectedPodcast).getLenght());
     }
 
     private void resetAndStartPlayer() {
         try {
+            isTrackLoading=true;
+
+            musicTitle.setText("Loading...");
+            musicTimeTV.setText(String.format("%02d:%02d", 0, 0));
+            musicTotalTimeTV.setText(String.format("%02d:%02d", 0, 0));
+
+            musicSeekbar.setProgress(0);
+            musicSeekbar.setSecondaryProgress(0);
+
             if (link != null) {
                 if(mediaPlayer == null) setPlayer();
-                mediaPlayer.reset();
+                else {
+                    mediaPlayer.release();
+                    mediaPlayer = null;
+                    setPlayer();
+                }
                 mediaPlayer.setDataSource(link);
                 mediaPlayer.prepareAsync();
-                updateEverySecond();
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -437,14 +434,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     public void GO(View v){
-        previousPodcast = -1;
+        String sPage = ((EditText)findViewById(R.id.pageNo)).getText().toString();
+        int page;
+        try{
+            page = Integer.valueOf(sPage);
+        }catch (Exception e){
+            return;
+        }
         selectedPodcast = -1;
         isStop = true;
         isPaused = true;
         if(mediaPlayer!=null && mediaPlayer.isPlaying())mediaPlayer.reset();
         if(pageLoading)return;
         pageLoading = true;
-        currentPage = Integer.valueOf(((EditText)findViewById(R.id.pageNo)).getText().toString());
+        currentPage = page;
         ((EditText)findViewById(R.id.pageNo)).setText("");
         podcastRV.setVisibility(View.GONE);
         loadPodcastRV.setVisibility(View.VISIBLE);
@@ -486,7 +489,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        previousPodcast = -1;
         selectedPodcast = -1;
         switch (item.getItemId()) {
             case R.id.prevPage:
@@ -630,3 +632,25 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
 }
+
+/*
+* isTrackLoading: Initial loading period for a track. Without this media player shutters
+* and display odd behaviour.
+* starts: At mediaplayer prepareasync
+* ends: OnBufferUpdate percent > 15
+* Task: media player ui controls wont work
+*
+* seekbar seekToZero:
+* Occurs: 1. ItemClick: diff pos, next pos.
+* 2. isStop
+* 3. isTrackLoading
+*
+* seekTo():
+* wont work when: 1. isStop
+* 2. isTrackLoading
+*
+* updateEverySecond:
+* start: OnBufferUpdate percent > 15
+*
+* */
+
