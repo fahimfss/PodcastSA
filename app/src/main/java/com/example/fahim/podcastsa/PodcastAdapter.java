@@ -16,6 +16,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -49,8 +50,6 @@ public class PodcastAdapter extends RecyclerView.Adapter<PodcastAdapter.PCViewHo
     @Override
     public void onBindViewHolder(final PCViewHolder holder, final int position) {
         PodcastItem pc = pcList.get(position);
-        holder.podcastTitle.setText(pc.getTitle());
-        holder.podcastSecTitle.setText(pc.getSecondaryTitle());
 
         if(pc.getStatus()==1){
             holder.cv.setCardBackgroundColor(Color.parseColor("#e8e8e8"));
@@ -85,6 +84,10 @@ public class PodcastAdapter extends RecyclerView.Adapter<PodcastAdapter.PCViewHo
                 }
             }
         });
+
+        holder.podcastTitle.setText(pc.getTitle());
+        holder.podcastSecTitle.setText(pc.getSecondaryTitle());
+
     }
 
     @Override

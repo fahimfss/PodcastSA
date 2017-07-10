@@ -80,6 +80,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private int initialLoading=0;
 
+    private boolean itemClickLock=false;
+
     private HashSet<String> firebaseDatas;
 
     FirebaseAuth auth;
@@ -130,7 +132,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         podcastRV = (RecyclerView) findViewById(R.id.podcastRV);
         loadPodcastRV = (ProgressBar) findViewById(R.id.loadPodcastRV);
 
-        podcastRV.setHasFixedSize(true);
         LinearLayoutManager llm = new LinearLayoutManager(this);
         podcastRV.setLayoutManager(llm);
 
@@ -200,15 +201,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void dataFetched() {
+        pageLoading = false;
         podcastRV.setVisibility(View.VISIBLE);
         loadPodcastRV.setVisibility(View.GONE);
     }
 
     @Override
     public void itemClick(int position, boolean unmark) throws InterruptedException {
+        if(itemClickLock)return;
+        itemClickLock = true;
+
         FirebaseData firebaseData = new FirebaseData(podcastItems.get(position).getLink());
 
-        if(podcastAdapter == null) return;
+        if(podcastAdapter == null) {
+            itemClickLock = false;
+            return;
+        }
 
         if(unmark){
             if(firebaseDatas.contains(firebaseData.getLink())){
@@ -217,6 +225,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 podcastItems.get(position).setStatus(0);
                 podcastAdapter.notifyDataSetChanged();
             }
+            itemClickLock = false;
             return;
         }
         if(!firebaseDatas.contains(firebaseData.getLink())) {
@@ -228,7 +237,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         podcastItems.get(position).setStatus(1);
         podcastAdapter.notifyDataSetChanged();
 
-        if(position==selectedPodcast && !isStop && !isPaused &&!isComplete)return;
+        if(position==selectedPodcast && !isStop && !isPaused &&!isComplete){
+            itemClickLock = false;
+            return;
+        }
 
 
         if(previousPodcast!=-1)podcastItems.get(previousPodcast).setPlaying(0);
@@ -247,6 +259,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         musicPlayBtn.setImageResource(R.drawable.ic_pause);
         musicPlayBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         resetAndStartPlayer();
+
+        itemClickLock = false;
     }
 
     public void musicPlayBtnClicked(View v) {
@@ -365,7 +379,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     try {
                         musicSeekbar.setProgress(0);
                         musicTimeTV.setText(String.format("%02d:%02d", 0, 0));
-                        itemClick(++selectedPodcast, false);
+                        isComplete = true;
+                        isComplete = true;
+                        itemClick(selectedPodcast+1, false);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -421,6 +437,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     public void GO(View v){
+        previousPodcast = -1;
+        selectedPodcast = -1;
         isStop = true;
         isPaused = true;
         if(mediaPlayer!=null && mediaPlayer.isPlaying())mediaPlayer.reset();
@@ -468,6 +486,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        previousPodcast = -1;
+        selectedPodcast = -1;
         switch (item.getItemId()) {
             case R.id.prevPage:
                 isStop = true;
@@ -525,7 +545,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     podcastAdapter.notifyDataSetChanged();
                 }
                 initialLoading++;
-                if(initialLoading==2)dataFetched();
+                if(initialLoading==2){
+                    initialLoading = -1;
+                    dataFetched();
+                }
             }
 
             @Override
@@ -593,8 +616,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 }
                 if (listener1 != null) query1.removeEventListener(listener1);
             }
-            initialLoading++;
-            if(initialLoading==2)dataFetched();
+            if(initialLoading!=-1){
+                initialLoading++;
+                if(initialLoading==2){
+                    initialLoading = -1;
+                    dataFetched();
+                }
+            }
+            else{
+                dataFetched();
+            }
         }
     }
+
 }
