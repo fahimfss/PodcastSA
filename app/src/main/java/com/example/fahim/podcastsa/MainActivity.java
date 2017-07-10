@@ -276,15 +276,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             public void run() {
                 if (mediaPlayer != null && updateEverySecondCount == 0) {
                     updateEverySecondCount++;
-                    while ((!isPaused || !isComplete) && !isStop && !isOutOfScope) {
+                    while ((!isPaused || !isComplete) && !isStop) {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
-                                setProgressTimeAndSeek();
+                                if(!isOutOfScope)setProgressTimeAndSeek();
                             }
                         });
                         try {
-                            Thread.sleep(125);
+                            Thread.sleep(250);
                         } catch (InterruptedException e) {
                             return;
                         } catch (Exception e) {
