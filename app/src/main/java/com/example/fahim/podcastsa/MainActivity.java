@@ -42,7 +42,7 @@ import java.util.HashSet;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
 
-//    private final String URL = "UPIUrl";
+    //    private final String URL = "UPIUrl";
     private final String URL = "Url";
     private final String LINK = "link";
     private final String PAGE = "Page";
@@ -276,11 +276,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             public void run() {
                 if (mediaPlayer != null && updateEverySecondCount == 0) {
                     updateEverySecondCount++;
-                    while ((!isPaused || !isComplete) && !isStop) {
+                    while ((!isPaused || !isComplete) && !isStop && !isOutOfScope) {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
-                                if(!isOutOfScope)setProgressTimeAndSeek();
+                                setProgressTimeAndSeek();
                             }
                         });
                         try {
@@ -653,4 +653,3 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 * start: OnBufferUpdate percent > 15
 *
 * */
-
