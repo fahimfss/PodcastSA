@@ -315,11 +315,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             @Override
             public void onBufferingUpdate(MediaPlayer mp, int percent) {
                 musicSeekbar.setSecondaryProgress((musicSeekbar.getMax() / 100) * percent);
-                if(percent>15 && mediaPlayer!=null && !isPaused){
-                    Log.d("On BUffering Update", "here");
+                if(percent>15 && mediaPlayer!=null ){
                     isTrackLoading = false;
-                    mediaPlayer.start();
-                    updateEverySecond();
+                    if(!isPaused) {
+                        mediaPlayer.start();
+                        updateEverySecond();
+                    }
                 }
             }
         });
